@@ -1,0 +1,15 @@
+// Bun Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`workflow works 1`] = `
+"digraph {
+  "child";
+  "parent2";
+  "grandparent2";
+  "parent1";
+  "grandparent1";
+  "parent1" -> "child";
+  "parent2" -> "child";
+  "grandparent2" -> "parent2";
+  "grandparent1" -> "parent1";
+}"
+`;
