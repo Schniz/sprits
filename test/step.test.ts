@@ -33,15 +33,14 @@ test("workflow works", async () => {
 	const child = Step.make({
 		name: "child",
 		inputs: [parent1, parent2],
-		run: Effect.sync(() => order.push("child")).pipe(
-			Effect.zipLeft(parent2.read),
-			Effect.zipLeft(parent1.read),
-		),
+		run: push.pipe(Effect.zipLeft(parent2.read), Effect.zipLeft(parent1.read)),
 	});
 
-	const effect = Step.run(child).pipe(Effect.andThen(() => order));
+	const effect = Step.run(child);
+	const result = await Effect.runPromise(effect);
+	expect(result).toBe("child");
 
-	expect(await Effect.runPromise(effect)).toEqual([
+	expect(order).toEqual([
 		"grandparent2",
 		"grandparent1",
 		"parent2",

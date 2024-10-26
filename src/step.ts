@@ -71,16 +71,8 @@ export type ParentStepContexts<S extends AnyStep> = _ParentStepContexts<
 const CurrentTag: Context.TagClass<
 	Current,
 	string,
-	{
-		readonly title: string;
-	}
-> = Effect.Tag("@sprits/__current__")<
-	Current,
-	{
-		readonly title: string;
-	}
->();
-
+	{ readonly title: string }
+> = Effect.Tag("@sprits/__current__")();
 export class Current extends CurrentTag {}
 
 const getDependencies = (s: AnyStep) =>
@@ -117,6 +109,9 @@ const getDependencies = (s: AnyStep) =>
 		return dependencies;
 	});
 
+/**
+ * Run a step and all of its dependencies
+ */
 export const run = <S extends AnyStep>(
 	step: S,
 ): Effect.Effect<
@@ -124,9 +119,7 @@ export const run = <S extends AnyStep>(
 	Effect.Effect.Error<S["run"]>,
 	Exclude<Effect.Effect.Context<S["run"]>, ParentStepContexts<S>>
 > =>
-	// @ts-expect-error
 	Effect.gen(function* () {
-		yield* Effect.yieldNow();
 		const dependencies = yield* getDependencies(step);
 		let context = Context.empty();
 
@@ -161,6 +154,17 @@ export const run = <S extends AnyStep>(
 					);
 				}),
 			{ concurrency: "unbounded" },
+		);
+
+		return yield* Effect.fromNullable(dependencies.get(step)).pipe(
+			Effect.orDie,
+			Effect.andThen(
+				(x) =>
+					x.whenResolved as Deferred.Deferred<
+						Effect.Effect.Success<S["run"]>,
+						Effect.Effect.Error<S["run"]>
+					>,
+			),
 		);
 	});
 
