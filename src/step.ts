@@ -68,12 +68,20 @@ export type ParentStepContexts<S extends AnyStep> = _ParentStepContexts<
 	S["inputs"]
 >;
 
-export class Current extends Effect.Tag("@step/__current__")<
+const CurrentTag: Context.TagClass<
+	Current,
+	string,
+	{
+		readonly title: string;
+	}
+> = Effect.Tag("@sprits/__current__")<
 	Current,
 	{
 		readonly title: string;
 	}
->() {}
+>();
+
+export class Current extends CurrentTag {}
 
 const getDependencies = (s: AnyStep) =>
 	Effect.gen(function* () {
@@ -156,7 +164,7 @@ export const run = <S extends AnyStep>(
 		);
 	});
 
-export const toDot = (step: AnyStep) =>
+export const toDot = (step: AnyStep): Effect.Effect<string, never, never> =>
 	Effect.gen(function* () {
 		const dependencies = yield* getDependencies(step);
 
