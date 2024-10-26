@@ -3,7 +3,7 @@ import { type NodeModel, digraph, toDot as toGraphvizDot } from "ts-graphviz";
 
 type ConstructionError<Inputs extends AnyStep[], R> = [
 	{
-		[key in keyof Inputs]: Inputs[key]["name"];
+		[key in keyof Inputs]: Inputs[key]["title"];
 	}[Extract<keyof Inputs, number>],
 	R,
 ] extends [infer Provided, StepContext<infer Requested>]
@@ -16,8 +16,11 @@ type ConstructionError<Inputs extends AnyStep[], R> = [
 
 const ConstructionError = Symbol("ConstructionError");
 
+/**
+ * Create a step
+ */
 export function make<
-	const Name extends string,
+	const Title extends string,
 	const Inputs extends AnyStep[],
 	A,
 	E,
@@ -25,32 +28,32 @@ export function make<
 	CE = ConstructionError<Inputs, R>,
 >(
 	...[opts]: [CE] extends [never]
-		? [Omit<Step<Name, A, E, R | Current, Inputs>, "read">]
+		? [Omit<Step<Title, A, E, R | Current, Inputs>, "read">]
 		: [
-				Omit<Step<Name, A, E, R | Current, Inputs>, "read"> & {
-					run: Step<Name, A, E, R | Current, Inputs>["run"] & [CE];
+				Omit<Step<Title, A, E, R | Current, Inputs>, "read"> & {
+					run: Step<Title, A, E, R | Current, Inputs>["run"] & [CE];
 				},
 			]
-): Step<Name, A, E, R, Inputs> {
+): Step<Title, A, E, R, Inputs> {
 	const run = opts.run.pipe(
-		Effect.provideService(Current, { title: String(opts.name) }),
+		Effect.provideService(Current, { title: String(opts.title) }),
 	);
 	return {
 		...opts,
 		run,
-		read: Context.GenericTag<StepContext<Name>, A>(`step/${opts.name}`),
+		read: Context.GenericTag<StepContext<Title>, A>(`step/${opts.title}`),
 		// biome-ignore lint/suspicious/noExplicitAny: you are not my father
 	} as any;
 }
 
-interface Step<Name extends string, A, E, R, Inputs extends AnyStep[]> {
-	name: Name;
+interface Step<Title extends string, A, E, R, Inputs extends AnyStep[]> {
+	title: Title;
 	readonly inputs: Inputs;
 	run: Effect.Effect<A, E, R>;
-	read: Effect.Effect<A, E, StepContext<Name>>;
+	read: Effect.Effect<A, E, StepContext<Title>>;
 }
 
-type StepContext<Name extends string> = `step/${Name}`;
+type StepContext<Title extends string> = `step/${Title}`;
 
 // biome-ignore lint/suspicious/noExplicitAny: no one cares
 type AnyStep = Step<any, any, any, any, any[]>;
@@ -61,7 +64,7 @@ type _ParentStepContexts<Ss extends AnyStep[], Current = never> = {
 	empty: Current;
 	nonempty: _ParentStepContexts<
 		[...Tail<Ss>, ...Ss[0]["inputs"]],
-		StepContext<Ss[0]["name"]> | Current
+		StepContext<Ss[0]["title"]> | Current
 	>;
 }[Ss extends [] ? "empty" : "nonempty"];
 export type ParentStepContexts<S extends AnyStep> = _ParentStepContexts<
@@ -73,6 +76,10 @@ const CurrentTag: Context.TagClass<
 	string,
 	{ readonly title: string }
 > = Effect.Tag("@sprits/__current__")();
+
+/**
+ * The current executed step
+ */
 export class Current extends CurrentTag {}
 
 const getDependencies = (s: AnyStep) =>
@@ -150,7 +157,7 @@ export const run = <S extends AnyStep>(
 							context = Context.add(context, ctx, value);
 						}),
 						Effect.onExit((exit) => Deferred.done(whenResolved, exit)),
-						Effect.annotateLogs({ step: step.name }),
+						Effect.annotateLogs({ step: step.title }),
 					);
 				}),
 			{ concurrency: "unbounded" },
@@ -175,11 +182,11 @@ export const toDot = (step: AnyStep): Effect.Effect<string, never, never> =>
 		const graph = digraph((g) => {
 			const nodes = {} as Record<string, NodeModel>;
 			for (const [step] of dependencies) {
-				nodes[step.name] = g.node(step.name);
+				nodes[step.title] = g.node(step.title);
 			}
 			for (const [step, { deps }] of dependencies) {
 				for (const dep of deps) {
-					g.edge([nodes[dep.name], nodes[step.name]]);
+					g.edge([nodes[dep.title], nodes[step.title]]);
 				}
 			}
 		});

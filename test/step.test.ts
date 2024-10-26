@@ -11,27 +11,27 @@ test("workflow works", async () => {
 		}),
 	);
 	const grandparent1 = Step.make({
-		name: "grandparent1",
+		title: "grandparent1",
 		inputs: [],
 		run: push,
 	});
 	const parent1 = Step.make({
-		name: "parent1",
+		title: "parent1",
 		inputs: [grandparent1],
 		run: push,
 	});
 	const grandparent2 = Step.make({
-		name: "grandparent2",
+		title: "grandparent2",
 		inputs: [],
 		run: push,
 	});
 	const parent2 = Step.make({
-		name: "parent2",
+		title: "parent2",
 		inputs: [grandparent2],
 		run: push,
 	});
 	const child = Step.make({
-		name: "child",
+		title: "child",
 		inputs: [parent1, parent2],
 		run: push.pipe(Effect.zipLeft(parent2.read), Effect.zipLeft(parent1.read)),
 	});
@@ -62,15 +62,15 @@ test("invalid dependency tree", async () => {
 	// a -> b -> d
 	// c --------^ but reads from a
 
-	const a = Step.make({ name: "a", run: push, inputs: [] });
-	const b = Step.make({ name: "b", run: push, inputs: [a] });
+	const a = Step.make({ title: "a", run: push, inputs: [] });
+	const b = Step.make({ title: "b", run: push, inputs: [a] });
 	const c = Step.make({
-		name: "c",
+		title: "c",
 		// @ts-expect-error
 		run: Effect.andThen(a.read, push),
 		inputs: [],
 	});
-	const d = Step.make({ name: "d", run: Effect.void, inputs: [b, c] });
+	const d = Step.make({ title: "d", run: Effect.void, inputs: [b, c] });
 
 	const effect = Step.run(d).pipe(Effect.andThen(() => order));
 
@@ -89,26 +89,26 @@ test("composition", async () => {
 		return title;
 	});
 	const subWorkflow = (prefix: string) => {
-		const a = Step.make({ name: `${prefix}_a`, run: push, inputs: [] });
+		const a = Step.make({ title: `${prefix}_a`, run: push, inputs: [] });
 		const b = Step.make({
-			name: `${prefix}_b`,
+			title: `${prefix}_b`,
 			run: Effect.andThen(a.read, push),
 			inputs: [a],
 		});
 		return Step.run(b);
 	};
 	const first = Step.make({
-		name: "first",
+		title: "first",
 		run: Effect.andThen(push, subWorkflow("first")).pipe(Effect.andThen(end)),
 		inputs: [],
 	});
 	const second = Step.make({
-		name: "second",
+		title: "second",
 		run: Effect.andThen(push, subWorkflow("second")).pipe(Effect.andThen(end)),
 		inputs: [],
 	});
 	const accumulate = Step.make({
-		name: "accumulate",
+		title: "accumulate",
 		run: Effect.void,
 		inputs: [first, second],
 	});
