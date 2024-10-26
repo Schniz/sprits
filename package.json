@@ -2,15 +2,17 @@
 	"name": "sprits",
 	"module": "src/index.ts",
 	"type": "module",
+	"version": "0.0.0",
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
-		"@types/bun": "latest"
+		"@types/bun": "latest",
+		"effect": "^3.10.4"
 	},
 	"peerDependencies": {
+		"effect": "^3.10.4",
 		"typescript": "^5.0.0"
 	},
 	"dependencies": {
-		"effect": "^3.10.4",
 		"ts-graphviz": "^2.1.4"
 	}
 }
