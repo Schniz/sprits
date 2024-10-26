@@ -39,52 +39,15 @@ export function make<
 		...opts,
 		run,
 		read: Context.GenericTag<StepContext<Name>, A>(`step/${opts.name}`),
+		// biome-ignore lint/suspicious/noExplicitAny: you are not my father
 	} as any;
 }
-
-const Info = Symbol("info");
-
-export type Info<S extends AnyStep> = NonNullable<S[typeof Info]>;
-
-type ImmediateProvidedContexts<
-	S extends AnyStep,
-	Inputs extends AnyStep[] = Info<S>["Inputs"],
-> = { [key in keyof Inputs]: StepContext<Inputs[key]["name"]> }[Extract<
-	keyof Inputs,
-	number
->];
-
-type RequiredContext<
-	S extends AnyStep,
-	Inputs extends AnyStep[] = [S, ...Info<S>["Inputs"]],
-	Current = never,
-> = {
-	empty: Current;
-	nonempty: RequiredContext<
-		S,
-		[...Tail<Inputs>, ...Inputs[0]["inputs"]],
-		| Current
-		| Exclude<
-				Effect.Effect.Context<Inputs[0]["run"]>,
-				ImmediateProvidedContexts<Inputs[0], Inputs[0]["inputs"]>
-		  >
-	>;
-}[Inputs extends [] ? "empty" : "nonempty"];
-// Effect.Effect.Context<S["run"]>
-// Exclude<Effect.Effect.Context<S["run"]>, ImmediateProvidedContexts<S, Inputs>>
 
 interface Step<Name extends string, A, E, R, Inputs extends AnyStep[]> {
 	name: Name;
 	readonly inputs: Inputs;
 	run: Effect.Effect<A, E, R>;
 	read: Effect.Effect<A, E, StepContext<Name>>;
-
-	[Info]?: {
-		Inputs: Inputs;
-		A: A;
-		E: E;
-		// R: R;
-	};
 }
 
 type StepContext<Name extends string> = `step/${Name}`;
