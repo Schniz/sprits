@@ -14,8 +14,6 @@ type ConstructionError<Inputs extends AnyStep[], R> = [
 			: `undeclared step input ${Requested}`
 	: never;
 
-const ConstructionError = Symbol("ConstructionError");
-
 /**
  * Create a step
  */

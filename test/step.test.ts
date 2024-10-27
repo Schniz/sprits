@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import * as Step from "../src/step";
-import { test, expect } from "bun:test";
+import { test, expect } from "vitest";
 
 test("workflow works", async () => {
 	const order = [] as string[];
@@ -33,7 +33,7 @@ test("workflow works", async () => {
 	const child = Step.make({
 		title: "child",
 		inputs: [parent1, parent2],
-		run: push.pipe(Effect.zipLeft(parent2.read), Effect.zipLeft(parent1.read)),
+		run: Effect.zipLeft(push, Effect.all([parent2.read, parent1.read])),
 	});
 
 	const effect = Step.run(child);
