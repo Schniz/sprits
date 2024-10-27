@@ -16,6 +16,37 @@ type ConstructionError<Inputs extends AnyStep[], R> = [
 			: `undeclared step input ${Requested}`
 	: never;
 
+class StepClass<
+	Title extends string,
+	Inputs extends AnyStep[],
+	A,
+	E,
+	R,
+> extends Effectable.Class<A, never, StepContext<Title>> {
+	public run: Effect.Effect<A, E, R>;
+
+	constructor(
+		public title: Title,
+		public inputs: Inputs,
+		run: Effect.Effect<A, E, R>,
+	) {
+		super();
+		const spanContext: StepContext<Title> = `@sprits/${title}`;
+		this[StepContextId] = class Ctx extends (
+			Context.Tag(spanContext)<StepContext<Title>, A>()
+		) {};
+		this.run = Effect.provideService(run as Effect.Effect<A, E, R>, Current, {
+			title,
+		});
+	}
+
+	public [StepContextId]: Context.Tag<StepContext<Title>, A>;
+
+	commit(): Effect.Effect<A, never, StepContext<Title>> {
+		return this[StepContextId];
+	}
+}
+
 /**
  * Create a step
  */
@@ -35,24 +66,11 @@ export function make<
 				inputs: Inputs;
 			},
 ): Step<Title, A, E, R, Inputs> {
-	class Ctx extends Context.Tag(`@sprits/${opts.title}`)<unknown, A>() {}
-
-	class Class extends Effectable.Class<A, never, StepContext<Title>> {
-		title = opts.title;
-		inputs = opts.inputs;
-		run = Effect.provideService(opts.run as Effect.Effect<A, E, R>, Current, {
-			title: opts.title,
-		});
-
-		commit(): Effect.Effect<A, never, StepContext<Title>> {
-			// @ts-expect-error trying to hack things
-			return Ctx;
-		}
-
-		[StepContextId] = Ctx;
-	}
-
-	return new Class();
+	return new StepClass(
+		opts.title,
+		opts.inputs,
+		opts.run as Effect.Effect<A, E, R>,
+	);
 }
 
 interface Step<Title extends string, A, E, R, Inputs extends AnyStep[]>
@@ -62,7 +80,7 @@ interface Step<Title extends string, A, E, R, Inputs extends AnyStep[]>
 	run: Effect.Effect<A, E, R>;
 }
 
-type StepContext<Title extends string> = `step/${Title}`;
+type StepContext<Title extends string> = `@sprits/${Title}`;
 
 // biome-ignore lint/suspicious/noExplicitAny: no one cares
 type AnyStep = Step<any, any, any, any, any[]>;
