@@ -147,4 +147,12 @@ const release = Step.make({
 // Generate a dot notation
 const dot = Step.toDot(release).pipe(Effect.runSync);
 Fs.writeFile("file.dot", dot);
+
+// Run the app
+Step.run(release)
+  .pipe(Effect.runPromise)
+  .then(
+    () => console.log("finished publishing"),
+    (err) => console.error(`Error: ${err}`),
+  );
 ```
