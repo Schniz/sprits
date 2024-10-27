@@ -25,13 +25,11 @@ export function make<
 	R,
 	CE = ConstructionError<Inputs, R>,
 >(
-	...[opts]: [CE] extends [never]
-		? [Omit<Step<Title, A, E, R | Current, Inputs>, "read">]
-		: [
-				Omit<Step<Title, A, E, R | Current, Inputs>, "read"> & {
-					run: Step<Title, A, E, R | Current, Inputs>["run"] & [CE];
-				},
-			]
+	opts: [CE] extends [never]
+		? Omit<Step<Title, A, E, R | Current, Inputs>, "read">
+		: Omit<Step<Title, A, E, R | Current, Inputs>, "read"> & {
+				run: Step<Title, A, E, R | Current, Inputs>["run"] & [CE];
+			},
 ): Step<Title, A, E, R, Inputs> {
 	const run = opts.run.pipe(
 		Effect.provideService(Current, { title: String(opts.title) }),
