@@ -13,7 +13,7 @@ class ProcessFailed extends Data.TaggedError("ProcessFailed")<{
 
 const runShell = (command: string, opts?: { cwd: string }) =>
 	Effect.async<void, ProcessFailed>((emit) => {
-		const spawned = spawn(`bash`, ["-c", command], { cwd: opts?.cwd });
+		const spawned = spawn("bash", ["-c", command], { cwd: opts?.cwd });
 		spawned.on("close", (code) => {
 			emit(code === 0 ? Effect.void : Effect.fail(new ProcessFailed({ code })));
 		});
@@ -36,7 +36,7 @@ const install = Step.make({
 	inputs: [clone],
 	run: Effect.gen(function* () {
 		const cwd = yield* clone;
-		yield* runShell(`pnpm install`, { cwd });
+		yield* runShell("pnpm install", { cwd });
 		return cwd;
 	}),
 });
@@ -55,7 +55,7 @@ const test = Step.make({
 	inputs: [install],
 	run: Effect.gen(function* () {
 		const cwd = yield* install;
-		yield* runShell(`pnpm run test`, { cwd });
+		yield* runShell("pnpm run test", { cwd });
 	}),
 });
 
@@ -64,7 +64,7 @@ const release = Step.make({
 	inputs: [install, test, build],
 	run: Effect.gen(function* () {
 		const cwd = yield* install;
-		yield* runShell(`pnpm publish`, { cwd });
+		yield* runShell("pnpm publish", { cwd });
 	}),
 });
 
