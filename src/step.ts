@@ -73,6 +73,34 @@ export function make<
 	);
 }
 
+/**
+ * Create a step
+ */
+export function makeAsync<
+	const Title extends string,
+	const Inputs extends AnyStep[],
+	A,
+>(opts: {
+	title: Title;
+	run: (
+		...args: { [K in keyof Inputs]: Effect.Effect.Success<Inputs[K]> }
+	) => Promise<A>;
+	inputs: Inputs;
+}): Step<Title, A, unknown, _ParentStepContexts<Inputs>, Inputs> {
+	const run = Effect.gen(function* () {
+		const inputs = yield* Effect.all(opts.inputs) as Effect.Effect<
+			{ [K in keyof Inputs]: Effect.Effect.Success<Inputs[K]> },
+			unknown,
+			_ParentStepContexts<Inputs>
+		>;
+		return yield* Effect.tryPromise({
+			try: () => opts.run(...inputs),
+			catch: (err) => err,
+		});
+	});
+	return make({ title: opts.title, inputs: opts.inputs, run });
+}
+
 interface Step<Title extends string, A, E, R, Inputs extends AnyStep[]>
 	extends Effect.Effect<A, never, StepContext<Title>> {
 	title: Title;
