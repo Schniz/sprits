@@ -3,7 +3,7 @@
 	"module": "./dist/es/index.mjs",
 	"main": "./dist/cjs/index.js",
 	"types": "./dist/cjs/index.d.ts",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"@changesets/cli": "^2.27.9",
