@@ -1,5 +1,7 @@
-import { Context, Deferred, Effect } from "effect";
+import { Context, Deferred, Effect, Effectable } from "effect";
 import { type NodeModel, digraph, toDot as toGraphvizDot } from "ts-graphviz";
+
+const StepContextId = Symbol("StepContextId");
 
 type ConstructionError<Inputs extends AnyStep[], R> = [
 	{
@@ -14,6 +16,37 @@ type ConstructionError<Inputs extends AnyStep[], R> = [
 			: `undeclared step input ${Requested}`
 	: never;
 
+class StepClass<
+	Title extends string,
+	Inputs extends AnyStep[],
+	A,
+	E,
+	R,
+> extends Effectable.Class<A, never, StepContext<Title>> {
+	public run: Effect.Effect<A, E, R>;
+
+	constructor(
+		public title: Title,
+		public inputs: Inputs,
+		run: Effect.Effect<A, E, R>,
+	) {
+		super();
+		const spanContext: StepContext<Title> = `@sprits/${title}`;
+		this[StepContextId] = class Ctx extends (
+			Context.Tag(spanContext)<StepContext<Title>, A>()
+		) {};
+		this.run = Effect.provideService(run as Effect.Effect<A, E, R>, Current, {
+			title,
+		});
+	}
+
+	public [StepContextId]: Context.Tag<StepContext<Title>, A>;
+
+	commit(): Effect.Effect<A, never, StepContext<Title>> {
+		return this[StepContextId];
+	}
+}
+
 /**
  * Create a step
  */
@@ -26,30 +59,28 @@ export function make<
 	CE = ConstructionError<Inputs, R>,
 >(
 	opts: [CE] extends [never]
-		? Omit<Step<Title, A, E, R | Current, Inputs>, "read">
-		: Omit<Step<Title, A, E, R | Current, Inputs>, "read"> & {
-				run: Step<Title, A, E, R | Current, Inputs>["run"] & [CE];
+		? { title: Title; run: Effect.Effect<A, E, R | Current>; inputs: Inputs }
+		: {
+				title: Title;
+				run: Effect.Effect<A, E, R | Current> & [CE];
+				inputs: Inputs;
 			},
 ): Step<Title, A, E, R, Inputs> {
-	const run = opts.run.pipe(
-		Effect.provideService(Current, { title: String(opts.title) }),
+	return new StepClass(
+		opts.title,
+		opts.inputs,
+		opts.run as Effect.Effect<A, E, R>,
 	);
-	return {
-		...opts,
-		run,
-		read: Context.GenericTag<StepContext<Title>, A>(`step/${opts.title}`),
-		// biome-ignore lint/suspicious/noExplicitAny: you are not my father
-	} as any;
 }
 
-interface Step<Title extends string, A, E, R, Inputs extends AnyStep[]> {
+interface Step<Title extends string, A, E, R, Inputs extends AnyStep[]>
+	extends Effect.Effect<A, never, StepContext<Title>> {
 	title: Title;
 	readonly inputs: Inputs;
 	run: Effect.Effect<A, E, R>;
-	read: Effect.Effect<A, E, StepContext<Title>>;
 }
 
-type StepContext<Title extends string> = `step/${Title}`;
+type StepContext<Title extends string> = `@sprits/${Title}`;
 
 // biome-ignore lint/suspicious/noExplicitAny: no one cares
 type AnyStep = Step<any, any, any, any, any[]>;
@@ -149,7 +180,8 @@ export const run = <S extends AnyStep>(
 					yield* step.run.pipe(
 						Effect.provide(context),
 						Effect.tap((value) => {
-							const ctx = step.read as Context.Tag<unknown, unknown>;
+							// @ts-expect-error meh
+							const ctx = step[StepContextId];
 							context = Context.add(context, ctx, value);
 						}),
 						Effect.onExit((exit) => Deferred.done(whenResolved, exit)),
