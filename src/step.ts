@@ -1,9 +1,11 @@
-import { Context, Deferred, Effect } from "effect";
+import { Context, Deferred, Effect, Predicate, Unify } from "effect";
 import { type NodeModel, digraph, toDot as toGraphvizDot } from "ts-graphviz";
+
+const StepCId = Symbol("StepC");
 
 type ConstructionError<Inputs extends AnyStep[], R> = [
 	{
-		[key in keyof Inputs]: Inputs[key]["title"];
+		[key in keyof Inputs]: Inputs[key];
 	}[Extract<keyof Inputs, number>],
 	R,
 ] extends [infer Provided, StepContext<infer Requested>]
@@ -12,6 +14,20 @@ type ConstructionError<Inputs extends AnyStep[], R> = [
 		: string extends Requested
 			? never
 			: `undeclared step input ${Requested}`
+	: never;
+
+type ConstructionErrorC<Inputs extends AnyStep[], R> = R extends {
+	[StepCId]: infer Requested;
+}
+	? [unknown] extends [Requested]
+		? never
+		: [Inputs[number]] extends [never]
+			? `undeclared step input \`${Requested["title"]}\``
+			: Inputs[number] extends { [StepCId]: infer Provided }
+				? [Exclude<Requested, Provided>] extends [never]
+					? never
+					: `undeclared step input \`${Requested["title"]}\``
+				: never
 	: never;
 
 /**
@@ -42,11 +58,42 @@ export function make<
 	} as any;
 }
 
+/**
+ * Create a step
+ */
+export const Class =
+	<const Self>() =>
+	<
+		const Title extends string,
+		const Inputs extends AnyStep[],
+		A,
+		E,
+		R,
+		CE = ConstructionErrorC<Inputs, R>,
+	>(
+		opts: [CE] extends [never]
+			? Omit<Step<Title, A, E, R | Current, Inputs>, "read">
+			: Omit<Step<Title, A, E, R | Current, Inputs>, "read" | "run"> & {
+					run: Step<Title, A, E, R | Current, Inputs>["run"] & [CE];
+				},
+	) => {
+		const run = (
+			opts.run as Step<Title, A, E, R | Current, Inputs>["run"]
+		).pipe(Effect.provideService(Current, { title: String(opts.title) }));
+		return class T extends Context.Tag(`@sprits/__${opts.title}__`)<Self, A>() {
+			static [StepCId] = T;
+			[StepCId] = T;
+			static title = opts.title;
+			static inputs = opts.inputs;
+			static run = run;
+			static read = Effect.suspend(() => T);
+		};
+	};
+
 interface Step<Title extends string, A, E, R, Inputs extends AnyStep[]> {
 	title: Title;
 	readonly inputs: Inputs;
 	run: Effect.Effect<A, E, R>;
-	read: Effect.Effect<A, E, StepContext<Title>>;
 }
 
 type StepContext<Title extends string> = `step/${Title}`;
@@ -71,7 +118,7 @@ const CurrentTag: Context.TagClass<
 	Current,
 	string,
 	{ readonly title: string }
-> = Effect.Tag("@sprits/__current__")();
+> = Effect.Tag("@sprits//__current__")();
 
 /**
  * The current executed step
