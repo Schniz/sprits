@@ -1,5 +1,7 @@
-import { Context, Deferred, Effect } from "effect";
+import { Context, Deferred, Effect, Effectable } from "effect";
 import { type NodeModel, digraph, toDot as toGraphvizDot } from "ts-graphviz";
+
+const StepContextId = Symbol("StepContextId");
 
 type ConstructionError<Inputs extends AnyStep[], R> = [
 	{
@@ -26,27 +28,38 @@ export function make<
 	CE = ConstructionError<Inputs, R>,
 >(
 	opts: [CE] extends [never]
-		? Omit<Step<Title, A, E, R | Current, Inputs>, "read">
-		: Omit<Step<Title, A, E, R | Current, Inputs>, "read"> & {
-				run: Step<Title, A, E, R | Current, Inputs>["run"] & [CE];
+		? { title: Title; run: Effect.Effect<A, E, R | Current>; inputs: Inputs }
+		: {
+				title: Title;
+				run: Effect.Effect<A, E, R | Current> & [CE];
+				inputs: Inputs;
 			},
 ): Step<Title, A, E, R, Inputs> {
-	const run = opts.run.pipe(
-		Effect.provideService(Current, { title: String(opts.title) }),
-	);
-	return {
-		...opts,
-		run,
-		read: Context.GenericTag<StepContext<Title>, A>(`step/${opts.title}`),
-		// biome-ignore lint/suspicious/noExplicitAny: you are not my father
-	} as any;
+	class Ctx extends Context.Tag(`@sprits/${opts.title}`)<unknown, A>() {}
+
+	class Class extends Effectable.Class<A, never, StepContext<Title>> {
+		title = opts.title;
+		inputs = opts.inputs;
+		run = Effect.provideService(opts.run as Effect.Effect<A, E, R>, Current, {
+			title: opts.title,
+		});
+
+		commit(): Effect.Effect<A, never, StepContext<Title>> {
+			// @ts-expect-error trying to hack things
+			return Ctx;
+		}
+
+		[StepContextId] = Ctx;
+	}
+
+	return new Class();
 }
 
-interface Step<Title extends string, A, E, R, Inputs extends AnyStep[]> {
+interface Step<Title extends string, A, E, R, Inputs extends AnyStep[]>
+	extends Effect.Effect<A, never, StepContext<Title>> {
 	title: Title;
 	readonly inputs: Inputs;
 	run: Effect.Effect<A, E, R>;
-	read: Effect.Effect<A, E, StepContext<Title>>;
 }
 
 type StepContext<Title extends string> = `step/${Title}`;
@@ -149,7 +162,8 @@ export const run = <S extends AnyStep>(
 					yield* step.run.pipe(
 						Effect.provide(context),
 						Effect.tap((value) => {
-							const ctx = step.read as Context.Tag<unknown, unknown>;
+							// @ts-expect-error meh
+							const ctx = step[StepContextId];
 							context = Context.add(context, ctx, value);
 						}),
 						Effect.onExit((exit) => Deferred.done(whenResolved, exit)),

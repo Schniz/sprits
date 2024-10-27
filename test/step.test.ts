@@ -33,7 +33,7 @@ test("workflow works", async () => {
 	const child = Step.make({
 		title: "child",
 		inputs: [parent1, parent2],
-		run: Effect.zipLeft(push, Effect.all([parent2.read, parent1.read])),
+		run: Effect.zipLeft(push, Effect.all([parent2, parent1])),
 	});
 
 	const effect = Step.run(child);
@@ -67,7 +67,7 @@ test("invalid dependency tree", async () => {
 	const c = Step.make({
 		title: "c",
 		// @ts-expect-error
-		run: Effect.andThen(a.read, push),
+		run: Effect.andThen(a, push),
 		inputs: [],
 	});
 	const d = Step.make({ title: "d", run: Effect.void, inputs: [b, c] });
@@ -75,7 +75,7 @@ test("invalid dependency tree", async () => {
 	const effect = Step.run(d).pipe(Effect.andThen(() => order));
 
 	const promise = Effect.runPromise(effect);
-	expect(promise).rejects.toThrow("Service not found: step/a");
+	expect(promise).rejects.toThrow("Service not found: @sprits/a");
 });
 
 test("composition", async () => {
@@ -92,7 +92,7 @@ test("composition", async () => {
 		const a = Step.make({ title: `${prefix}_a`, run: push, inputs: [] });
 		const b = Step.make({
 			title: `${prefix}_b`,
-			run: Effect.andThen(a.read, push),
+			run: Effect.andThen(a, push),
 			inputs: [a],
 		});
 		return Step.run(b);
