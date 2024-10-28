@@ -1,6 +1,11 @@
 import { Context, Deferred, Effect, Effectable } from "effect";
 import { type NodeModel, digraph, toDot as toGraphvizDot } from "ts-graphviz";
 
+// biome-ignore lint/suspicious/noExplicitAny: it's a helper
+type SuppressError<Reason> = any | Reason;
+// biome-ignore lint/suspicious/noExplicitAny: this allows us to extend anything
+type AnyGeneric = any;
+
 const StepContextId = Symbol("StepContextId");
 
 type ConstructionError<Inputs extends AnyStep[], R> = [
@@ -82,10 +87,14 @@ interface Step<Title extends string, A, E, R, Inputs extends AnyStep[]>
 
 type StepContext<Title extends string> = `@sprits/${Title}`;
 
-// biome-ignore lint/suspicious/noExplicitAny: no one cares
-type AnyStep = Step<any, any, any, any, any[]>;
-// biome-ignore lint/suspicious/noExplicitAny: no one cares
-type Tail<Ts> = Ts extends [any, ...infer T] ? T : [];
+type AnyStep = Step<
+	AnyGeneric,
+	AnyGeneric,
+	AnyGeneric,
+	AnyGeneric,
+	AnyGeneric[]
+>;
+type Tail<Ts> = Ts extends [AnyGeneric, ...infer T] ? T : [];
 
 type _ParentStepContexts<Ss extends AnyStep[], Current = never> = {
 	empty: Current;
@@ -154,13 +163,13 @@ type AllNonStepDependencies<Inputs extends AnyStep[], Result = never> = {
 /**
  * Run a step and all of its dependencies
  */
-export const run = <S extends AnyStep>(
+export const run = <const S extends AnyStep>(
 	step: S,
 ): Effect.Effect<
 	Effect.Effect.Success<S["run"]>,
 	Effect.Effect.Error<S["run"]>,
 	| Exclude<Effect.Effect.Context<S["run"]>, ParentStepContexts<S>>
-	| AllNonStepDependencies<S["inputs"]>
+	| AllNonStepDependencies<[S]>
 > =>
 	Effect.gen(function* () {
 		const dependencies = yield* getDependencies(step);
@@ -210,7 +219,7 @@ export const run = <S extends AnyStep>(
 					>,
 			),
 		);
-	});
+	}) as SuppressError<"TypeScript complains that Effect.gen is inferring stuff here. We don't really need that.'">;
 
 export const toDot = (step: AnyStep): Effect.Effect<string, never, never> =>
 	Effect.gen(function* () {
