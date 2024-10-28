@@ -1,8 +1,11 @@
 import { Effect } from "effect";
 import * as Step from "../src/step";
-import { test, expect } from "vitest";
+import { test, expect, expectTypeOf } from "vitest";
 
 test("workflow works", async () => {
+	class Srv extends Effect.Service<Srv>()("Srv", {
+		succeed: { value: "hi" },
+	}) {}
 	const order = [] as string[];
 	const push = Step.Current.pipe(
 		Effect.andThen(({ title }) => {
@@ -13,7 +16,7 @@ test("workflow works", async () => {
 	const grandparent1 = Step.make({
 		title: "grandparent1",
 		inputs: [],
-		run: push,
+		run: Effect.zipLeft(push, Srv),
 	});
 	const parent1 = Step.make({
 		title: "parent1",
@@ -37,7 +40,12 @@ test("workflow works", async () => {
 	});
 
 	const effect = Step.run(child);
-	const result = await Effect.runPromise(effect);
+
+	expectTypeOf(effect).toEqualTypeOf<Effect.Effect<string, never, Srv>>();
+
+	const result = await Effect.runPromise(
+		effect.pipe(Effect.provide(Srv.Default)),
+	);
 	expect(result).toBe("child");
 
 	expect(order).toEqual([
