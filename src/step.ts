@@ -5,15 +5,15 @@ const StepContextId = Symbol("StepContextId");
 
 type ConstructionError<Inputs extends AnyStep[], R> = [
 	{
-		[key in keyof Inputs]: Inputs[key];
+		[key in keyof Inputs]: Inputs[key]["title"];
 	}[Extract<keyof Inputs, number>],
-	Extract<R, AnyStep>,
-] extends [infer Provided, infer Requested]
+	R,
+] extends [infer Provided, StepContext<infer Requested>]
 	? Exclude<Requested, Provided> extends never
 		? never
 		: string extends Requested
 			? never
-			: `undeclared step input ${Extract<Exclude<Requested, Provided>, AnyStep>["title"]}`
+			: `undeclared step input ${Requested}`
 	: never;
 
 class StepClass<
@@ -22,7 +22,7 @@ class StepClass<
 	A,
 	E,
 	R,
-> extends Effectable.Class<A, never, Step<Title, A, E, R, Inputs>> {
+> extends Effectable.Class<A, never, StepContext<Title>> {
 	public run: Effect.Effect<A, E, R>;
 
 	constructor(
@@ -31,18 +31,18 @@ class StepClass<
 		run: Effect.Effect<A, E, R>,
 	) {
 		super();
-		const spanContext = `@sprits/${title}`;
+		const spanContext: StepContext<Title> = `@sprits/${title}`;
 		this[StepContextId] = class Ctx extends (
-			Context.Tag(spanContext)<Step<Title, A, E, R, Inputs>, A>()
+			Context.Tag(spanContext)<StepContext<Title>, A>()
 		) {};
 		this.run = Effect.provideService(run as Effect.Effect<A, E, R>, Current, {
 			title,
 		});
 	}
 
-	public [StepContextId]: Context.Tag<Step<Title, A, E, R, Inputs>, A>;
+	public [StepContextId]: Context.Tag<StepContext<Title>, A>;
 
-	commit(): Effect.Effect<A, never, Step<Title, A, E, R, Inputs>> {
+	commit(): Effect.Effect<A, never, StepContext<Title>> {
 		return this[StepContextId];
 	}
 }
@@ -74,7 +74,7 @@ export function make<
 }
 
 interface Step<Title extends string, A, E, R, Inputs extends AnyStep[]>
-	extends Effect.Effect<A, never, Step<Title, A, E, R, Inputs>> {
+	extends Effect.Effect<A, never, StepContext<Title>> {
 	title: Title;
 	readonly inputs: Inputs;
 	run: Effect.Effect<A, E, R>;
@@ -91,7 +91,7 @@ type _ParentStepContexts<Ss extends AnyStep[], Current = never> = {
 	empty: Current;
 	nonempty: _ParentStepContexts<
 		[...Tail<Ss>, ...Ss[0]["inputs"]],
-		Ss[0] | Current
+		StepContext<Ss[0]["title"]> | Current
 	>;
 }[Ss extends [] ? "empty" : "nonempty"];
 export type ParentStepContexts<S extends AnyStep> = _ParentStepContexts<

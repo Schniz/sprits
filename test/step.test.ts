@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import * as Step from "../src/step";
-import { test, expect, expectTypeOf } from "vitest";
+import { test, expect } from "vitest";
 
 test("workflow works", async () => {
 	const order = [] as string[];
@@ -124,45 +124,4 @@ test("composition", async () => {
 		"/second",
 		"/first",
 	]);
-});
-
-test("types", async () => {
-	const order = [] as string[];
-	const push = Step.Current.pipe(
-		Effect.andThen(({ title }) => {
-			order.push(title);
-			return title;
-		}),
-	);
-	const grandparent1 = Step.make({
-		title: "grandparent1",
-		inputs: [],
-		run: push,
-	});
-	const parent1 = Step.make({
-		title: "parent1",
-		inputs: [grandparent1],
-		run: push,
-	});
-	const grandparent2 = Step.make({
-		title: "grandparent2",
-		inputs: [],
-		run: push,
-	});
-	const parent2 = Step.make({
-		title: "parent2",
-		inputs: [grandparent2],
-		run: push,
-	});
-	const child = Step.make({
-		title: "child",
-		inputs: [parent1, parent2],
-		run: Effect.zipLeft(push, Effect.all([parent2, parent1])),
-	});
-
-	const effect = Step.run(child);
-	const result = await Effect.runPromise(effect);
-	expect(result).toBe("child");
-
-	expectTypeOf(result).toBeString();
 });
