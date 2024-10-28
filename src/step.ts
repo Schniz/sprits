@@ -22,11 +22,7 @@ class StepClass<
 	A,
 	E,
 	R,
-> extends Effectable.Class<
-	A,
-	never,
-	StepContext<Title> | Exclude<R, StepContext<string>>
-> {
+> extends Effectable.Class<A, never, StepContext<Title>> {
 	public run: Effect.Effect<A, E, R>;
 
 	constructor(
@@ -69,19 +65,7 @@ export function make<
 				run: Effect.Effect<A, E, R | Current> & [CE];
 				inputs: Inputs;
 			},
-): Step<
-	Title,
-	A,
-	E,
-	| R
-	| Exclude<
-			{
-				[key in keyof Inputs]: Effect.Effect.Context<Inputs[key]["run"]>;
-			}[number],
-			StepContext<string> | Current
-	  >,
-	Inputs
-> {
+): Step<Title, A, E, R, Inputs> {
 	return new StepClass(
 		opts.title,
 		opts.inputs,
@@ -90,11 +74,7 @@ export function make<
 }
 
 interface Step<Title extends string, A, E, R, Inputs extends AnyStep[]>
-	extends Effect.Effect<
-		A,
-		never,
-		StepContext<Title> | Exclude<R, StepContext<string>>
-	> {
+	extends Effect.Effect<A, never, StepContext<Title>> {
 	title: Title;
 	readonly inputs: Inputs;
 	run: Effect.Effect<A, E, R>;
@@ -166,9 +146,8 @@ const getDependencies = (s: AnyStep) =>
 type AllNonStepDependencies<Inputs extends AnyStep[], Result = never> = {
 	empty: Exclude<Result, StepContext<string> | Current>;
 	nonempty: AllNonStepDependencies<
-		Tail<Inputs>,
-		| Exclude<Result, StepContext<string>>
-		| Effect.Effect.Context<Inputs[0]["run"]>
+		[...Tail<Inputs>, ...Inputs[0]["inputs"]],
+		Result | Effect.Effect.Context<Inputs[0]["run"]>
 	>;
 }[Inputs extends [] ? "empty" : "nonempty"];
 
