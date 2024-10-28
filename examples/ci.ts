@@ -3,9 +3,11 @@ import { Config, Data, Effect } from "effect";
 import Fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 
-const RandomDirectory = {
-	make: Effect.promise(() => Fs.mkdtemp("ci-")),
-};
+class RandomDirectory extends Effect.Service<RandomDirectory>()("@ci/random", {
+	sync: () => ({
+		make: Effect.promise(() => Fs.mkdtemp("ci-")),
+	}),
+}) {}
 
 class ProcessFailed extends Data.TaggedError("ProcessFailed")<{
 	code: null | number;
@@ -24,7 +26,7 @@ const clone = Step.make({
 	title: "clone",
 	inputs: [],
 	run: Effect.gen(function* () {
-		const cwd = yield* RandomDirectory.make;
+		const cwd = yield* RandomDirectory.use((r) => r.make);
 		const repo = yield* Config.string("GIT_REPO");
 		yield* runShell(`git clone ${repo} ${cwd}`);
 		return cwd;
